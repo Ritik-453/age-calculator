@@ -19,7 +19,7 @@ A simple web app built with **Flask** that calculates your exact age in years, m
 
 ```bash
 # 1️⃣ Clone the repository
-git clone https://github.com/<your-username>/age-calculator.git
+git clone https://github.com/Ritik-453/age-calculator.git
 cd age-calculator
 
 # 2️⃣ Install dependencies
@@ -27,3 +27,4 @@ pip install -r requirements.txt
 
 # 3️⃣ Run the app
 python app.py
+
