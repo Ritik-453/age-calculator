@@ -1,27 +1,183 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
-    <meta charset="UTF-8">
-    <title>Age Calculator</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGE — an instrument for measuring time</title>
+<meta name="description" content="A precise, elegant age calculator with live counters, zodiac, generation, next-birthday countdown and more.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2246%22 fill=%22%230a0d1a%22 stroke=%22%23c9a227%22 stroke-width=%224%22/><circle cx=%2250%22 cy=%2250%22 r=%226%22 fill=%22%23e8c65a%22/></svg>">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Age Calculator</h1>
-    <form method="post">
-        <label>Enter your birth date (DD-MM-YYYY):</label>
-        <input type="text" name="dob" required>
-        <button type="submit">Calculate</button>
-    </form>
+  <canvas id="starfield" aria-hidden="true"></canvas>
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
 
-    {% if error %}
-        <p style="color:red">{{ error }}</p>
-    {% endif %}
+  <div class="shell">
 
-    {% if result %}
-        <h2>Your Age:</h2>
-        <p>{{ result.years }} years, {{ result.months }} months, {{ result.days }} days</p>
-        <p>Decimal years: {{ result.decimal_years }}</p>
-        <p>Total days lived: {{ result.total_days }}</p>
-        <p>Time until next birthday: {{ result.next_birthday_months }} months, {{ result.next_birthday_days }} days</p>
-    {% endif %}
+    <header class="top-bar">
+      <div class="wordmark">
+        <span class="glyph" aria-hidden="true">⏣</span>
+        <span class="name">AGE</span>
+        <span class="tagline">an instrument for measuring time</span>
+      </div>
+      <button id="themeToggle" class="theme-toggle js-only" type="button" aria-label="Toggle day / night theme">
+        <span class="icon moon" aria-hidden="true">☾</span>
+        <span class="icon sun" aria-hidden="true">☀</span>
+        <span class="knob"></span>
+      </button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Precision chronometry, since your first breath</p>
+        <h1>How long have you<br><em>been becoming</em> you?</h1>
+        <p class="sub">Set the dial to your date of birth. The instrument will resolve your exact age, live, down to the second — plus a few curiosities along the way.</p>
+
+        <form id="ageForm" method="post" action="/" autocomplete="off">
+          <div class="orrery" aria-hidden="false">
+            <div class="ring ring--outer"></div>
+            <div class="ring ring--mid"></div>
+            <div class="ring ring--inner"></div>
+            <span class="sun" aria-hidden="true"></span>
+
+            <div class="console">
+              <div class="date-input-wrap">
+                <label for="dob">Date of birth</label>
+                <input type="date" id="dob" name="dob" required
+                       value="{{ result.dob_iso if result else '' }}">
+              </div>
+              <button type="submit" class="btn-calc">Read the instrument</button>
+              <p id="errorMsg" class="error-msg{{ ' show' if error else '' }}">{{ error or '' }}</p>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ JS-powered live dashboard (populated by main.js) ============ -->
+      <section id="results" class="js-only" aria-label="Your age, calculated live">
+
+        <div class="dial-row">
+          <div class="dial">
+            <div class="num" id="years">0</div>
+            <div class="lbl">Years</div>
+          </div>
+          <div class="dial">
+            <div class="num" id="months">0</div>
+            <div class="lbl">Months</div>
+          </div>
+          <div class="dial">
+            <div class="num" id="days">0</div>
+            <div class="lbl">Days</div>
+          </div>
+        </div>
+
+        <p class="ticker">
+          <span id="liveTotalDays">0</span> days lived, and the instrument keeps turning
+          <span class="flip-clock" id="liveClock" aria-label="live time of day since birth"></span>
+          <span id="birthdayBadge" style="display:none; margin-left:8px; color: var(--accent-gold-bright);">🎂 Happy birthday!</span>
+        </p>
+
+        <p class="tools-heading">Readings from the instrument</p>
+        <div class="grid">
+
+          <div class="card">
+            <div class="card-top"><span class="icon">☾</span><span class="card-lbl">Born on a</span></div>
+            <div class="card-val" id="valDayOfWeek">—</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">✦</span><span class="card-lbl">Zodiac sign</span></div>
+            <div class="card-val" id="valZodiac">—</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">龍</span><span class="card-lbl">Chinese zodiac</span></div>
+            <div class="card-val" id="valChinese">—</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">◈</span><span class="card-lbl">Generation</span></div>
+            <div class="card-val" id="valGeneration">—</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">↻</span><span class="card-lbl">Leap years lived</span></div>
+            <div class="card-val" id="valLeap">—</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">♡</span><span class="card-lbl">Estimated heartbeats</span></div>
+            <div class="card-val" id="valHeartbeats">—</div>
+            <div class="card-sub">at a resting ~75 bpm — a rough estimate, not medical advice</div>
+          </div>
+
+          <div class="card wide">
+            <div class="card-top"><span class="icon">⏳</span><span class="card-lbl">Time lived, by unit</span></div>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); margin-top:4px;">
+              <div><div class="card-val" id="valWeeks" style="font-size:16px;">—</div><div class="card-sub">weeks</div></div>
+              <div><div class="card-val" id="valHours" style="font-size:16px;">—</div><div class="card-sub">hours</div></div>
+              <div><div class="card-val" id="valMinutes" style="font-size:16px;">—</div><div class="card-sub">minutes</div></div>
+              <div><div class="card-val" id="valSeconds" style="font-size:16px;">—</div><div class="card-sub">seconds</div></div>
+            </div>
+          </div>
+
+          <div class="card wide">
+            <div class="card-top"><span class="icon">◷</span><span class="card-lbl">Next birthday in</span></div>
+            <div class="countdown">
+              <div class="seg"><div class="n" id="cdDays">0</div><div class="u">days</div></div>
+              <div class="seg"><div class="n" id="cdHours">00</div><div class="u">hrs</div></div>
+              <div class="seg"><div class="n" id="cdMinutes">00</div><div class="u">min</div></div>
+              <div class="seg"><div class="n" id="cdSeconds">00</div><div class="u">sec</div></div>
+            </div>
+          </div>
+
+          <div class="card wide">
+            <div class="card-top"><span class="icon">◐</span><span class="card-lbl">Life dial</span></div>
+            <div class="card-sub">Progress toward an assumed 80-year span — a curiosity, not a prediction. Currently <span id="lifePct">0%</span>.</div>
+            <div class="life-bar-track"><div class="life-bar-fill" id="lifeBarFill"></div></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ No-JS fallback: server-rendered result ============ -->
+      {% if result %}
+      <section class="noscript-results" aria-label="Your age">
+        <div class="dial-row">
+          <div class="dial"><div class="num">{{ result.years }}</div><div class="lbl">Years</div></div>
+          <div class="dial"><div class="num">{{ result.months }}</div><div class="lbl">Months</div></div>
+          <div class="dial"><div class="num">{{ result.days }}</div><div class="lbl">Days</div></div>
+        </div>
+        <p class="ticker">{{ result.total_days }} total days lived · {{ result.decimal_years }} years exactly</p>
+        <p class="tools-heading">Readings from the instrument</p>
+        <div class="grid">
+          <div class="card"><div class="card-lbl">Born on a</div><div class="card-val">{{ result.day_of_week }}</div></div>
+          <div class="card"><div class="card-lbl">Zodiac sign</div><div class="card-val">{{ result.zodiac_symbol }} {{ result.zodiac }}</div></div>
+          <div class="card"><div class="card-lbl">Chinese zodiac</div><div class="card-val">{{ result.chinese_zodiac }}</div></div>
+          <div class="card"><div class="card-lbl">Generation</div><div class="card-val">{{ result.generation }}</div></div>
+          <div class="card"><div class="card-lbl">Leap years lived</div><div class="card-val">{{ result.leap_years }}</div></div>
+          <div class="card"><div class="card-lbl">Next birthday</div><div class="card-val">in {{ result.next_birthday_days }} days</div></div>
+          <div class="card wide">
+            <div class="card-lbl">Time lived, by unit</div>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); margin-top:4px;">
+              <div><div class="card-val" style="font-size:16px;">{{ result.total_weeks }}</div><div class="card-sub">weeks</div></div>
+              <div><div class="card-val" style="font-size:16px;">{{ result.total_hours }}</div><div class="card-sub">hours</div></div>
+              <div><div class="card-val" style="font-size:16px;">{{ result.total_minutes }}</div><div class="card-sub">minutes</div></div>
+              <div><div class="card-val" style="font-size:16px;">{{ result.total_seconds }}</div><div class="card-sub">seconds</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+    </main>
+
+    <footer>
+      <p>Built with care · dates never leave your browser once loaded · <span class="noscript-note">enable JavaScript for the live dashboard</span></p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
