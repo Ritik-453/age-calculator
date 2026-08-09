@@ -67,32 +67,12 @@
     requestAnimationFrame(draw);
   }
 
-  /* ============ DATA HELPERS ============ */
-  var ZODIAC = [
-    [[1, 20], [2, 18], "Aquarius", "♒"],
-    [[2, 19], [3, 20], "Pisces", "♓"],
-    [[3, 21], [4, 19], "Aries", "♈"],
-    [[4, 20], [5, 20], "Taurus", "♉"],
-    [[5, 21], [6, 20], "Gemini", "♊"],
-    [[6, 21], [7, 22], "Cancer", "♋"],
-    [[7, 23], [8, 22], "Leo", "♌"],
-    [[8, 23], [9, 22], "Virgo", "♍"],
-    [[9, 23], [10, 22], "Libra", "♎"],
-    [[10, 23], [11, 21], "Scorpio", "♏"],
-    [[11, 22], [12, 21], "Sagittarius", "♐"],
-    [[12, 22], [1, 19], "Capricorn", "♑"]
-  ];
-  var CHINESE = ["Monkey", "Rooster", "Dog", "Pig", "Rat", "Ox", "Tiger", "Rabbit", "Dragon", "Snake", "Horse", "Goat"];
-  var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  /* ============ CONSTANTS ============ */
+  var SYNODIC_MONTH_DAYS = 29.530588853;
+  var MARS_YEAR_DAYS = 686.9713;
 
-  function zodiacOf(month, day) {
-    for (var i = 0; i < ZODIAC.length; i++) {
-      var s = ZODIAC[i][0], e = ZODIAC[i][1];
-      if (month === s[0] && day >= s[1]) return { name: ZODIAC[i][2], symbol: ZODIAC[i][3] };
-      if (month === e[0] && day <= e[1]) return { name: ZODIAC[i][2], symbol: ZODIAC[i][3] };
-    }
-    return { name: "Capricorn", symbol: "♑" };
-  }
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
 
   function generationOf(year) {
     if (year >= 2013) return "Generation Alpha";
@@ -104,13 +84,28 @@
   }
 
   function isLeap(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
-
   function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
 
-  function computeAge(dob, now) {
-    var years = now.getFullYear() - dob.getFullYear();
-    var months = now.getMonth() - dob.getMonth();
-    var days = now.getDate() - dob.getDate();
+  function safeDate(y, mIdx, d) {
+    var dt = new Date(y, mIdx, 1);
+    var max = daysInMonth(y, mIdx + 1);
+    dt.setDate(Math.min(d, max));
+    return dt;
+  }
+
+  /* ============ AGE MATH (mirrors the server's exact-time logic) ============ */
+  function computeAge(dobDate, tobHH, tobMM, now) {
+    var birthDt = new Date(dobDate.getFullYear(), dobDate.getMonth(), dobDate.getDate(), tobHH, tobMM, 0);
+
+    var years = now.getFullYear() - dobDate.getFullYear();
+    var months = now.getMonth() - dobDate.getMonth();
+    var days = now.getDate() - dobDate.getDate();
+
+    var nowClock = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    var tobClock = tobHH * 3600 + tobMM * 60;
+    if (nowClock < tobClock) days -= 1;
+
     if (days < 0) {
       months -= 1;
       var pm = now.getMonth() === 0 ? 12 : now.getMonth();
@@ -119,41 +114,38 @@
     }
     if (months < 0) { months += 12; years -= 1; }
 
-    var msPerDay = 86400000;
-    var totalDays = Math.floor((startOfDay(now) - startOfDay(dob)) / msPerDay);
+    var totalMs = now.getTime() - birthDt.getTime();
+    var totalSeconds = Math.floor(totalMs / 1000);
+    var totalDays = Math.floor(totalSeconds / 86400);
 
     var nextBdayYear = now.getFullYear();
-    var thisYearBday = safeDate(nextBdayYear, dob.getMonth(), dob.getDate());
-    if (startOfDay(thisYearBday) < startOfDay(now)) {
-      nextBdayYear += 1;
-    }
-    var nextBirthday = safeDate(nextBdayYear, dob.getMonth(), dob.getDate());
+    var thisYearBday = safeDate(nextBdayYear, dobDate.getMonth(), dobDate.getDate());
+    thisYearBday.setHours(tobHH, tobMM, 0, 0);
+    if (thisYearBday.getTime() < now.getTime()) nextBdayYear += 1;
+    var nextBirthday = safeDate(nextBdayYear, dobDate.getMonth(), dobDate.getDate());
+    nextBirthday.setHours(tobHH, tobMM, 0, 0);
 
     var leapYears = 0;
-    for (var y = dob.getFullYear(); y <= now.getFullYear(); y++) if (isLeap(y)) leapYears++;
+    for (var y = dobDate.getFullYear(); y <= now.getFullYear(); y++) if (isLeap(y)) leapYears++;
 
-    var z = zodiacOf(dob.getMonth() + 1, dob.getDate());
+    var fullMoons = Math.floor(totalDays / SYNODIC_MONTH_DAYS);
+    var marsYearsExact = totalDays / MARS_YEAR_DAYS;
 
     return {
       years: years, months: months, days: days,
-      totalDays: totalDays,
+      totalDays: totalDays, totalSeconds: totalSeconds,
       totalWeeks: Math.floor(totalDays / 7),
-      dayOfWeek: DAYS[dob.getDay()],
-      zodiac: z.name, zodiacSymbol: z.symbol,
-      chineseZodiac: CHINESE[((dob.getFullYear() % 12) + 12) % 12],
-      generation: generationOf(dob.getFullYear()),
+      totalHours: Math.floor(totalSeconds / 3600),
+      totalMinutes: Math.floor(totalSeconds / 60),
+      dayOfWeek: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dobDate.getDay()],
+      generation: generationOf(dobDate.getFullYear()),
       leapYears: leapYears,
+      fullMoons: fullMoons,
+      marsYearsExact: marsYearsExact,
+      marsYearsWhole: Math.floor(marsYearsExact),
       nextBirthday: nextBirthday,
-      isBirthdayToday: now.getMonth() === dob.getMonth() && now.getDate() === dob.getDate()
+      isBirthdayToday: now.getMonth() === dobDate.getMonth() && now.getDate() === dobDate.getDate()
     };
-  }
-
-  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
-  function safeDate(y, mIdx, d) {
-    var dt = new Date(y, mIdx, 1);
-    var max = daysInMonth(y, mIdx + 1);
-    dt.setDate(Math.min(d, max));
-    return dt;
   }
 
   /* ============ COUNT-UP ANIMATION ============ */
@@ -240,17 +232,169 @@
     requestAnimationFrame(loop);
   }
 
+  /* ============ CUSTOM CALENDAR WIDGET ============ */
+  var calState = { viewYear: null, viewMonth: null, selected: null };
+  var dobHidden = document.getElementById("dob");
+  var dobDisplay = document.getElementById("dobDisplay");
+  var dobDisplayText = document.getElementById("dobDisplayText");
+  var calendarPanel = document.getElementById("calendarPanel");
+  var calGrid = document.getElementById("calGrid");
+  var calMonthSelect = document.getElementById("calMonthSelect");
+  var calYearSelect = document.getElementById("calYearSelect");
+
+  function fmtDisplay(d) {
+    return d.getDate() + " " + MONTH_NAMES[d.getMonth()] + " " + d.getFullYear();
+  }
+
+  function initCalendar() {
+    if (!calendarPanel) return;
+    var today = new Date();
+    calState.viewYear = today.getFullYear();
+    calState.viewMonth = today.getMonth();
+
+    MONTH_NAMES.forEach(function (name, i) {
+      var opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = name;
+      calMonthSelect.appendChild(opt);
+    });
+    for (var y = today.getFullYear(); y >= 1900; y--) {
+      var opt2 = document.createElement("option");
+      opt2.value = y;
+      opt2.textContent = y;
+      calYearSelect.appendChild(opt2);
+    }
+
+    if (dobHidden.value) {
+      var parts = dobHidden.value.split("-").map(Number);
+      var d = new Date(parts[0], parts[1] - 1, parts[2]);
+      calState.selected = d;
+      calState.viewYear = d.getFullYear();
+      calState.viewMonth = d.getMonth();
+      dobDisplayText.textContent = fmtDisplay(d);
+      dobDisplay.classList.remove("placeholder");
+    }
+
+    renderCalendar();
+
+    dobDisplay.addEventListener("click", function () {
+      var isOpen = !calendarPanel.hasAttribute("hidden");
+      if (isOpen) closeCalendar(); else openCalendar();
+    });
+
+    document.getElementById("calPrevMonth").addEventListener("click", function () { shiftMonth(-1); });
+    document.getElementById("calNextMonth").addEventListener("click", function () { shiftMonth(1); });
+    document.getElementById("calPrevYear").addEventListener("click", function () { shiftYear(-1); });
+    document.getElementById("calNextYear").addEventListener("click", function () { shiftYear(1); });
+    document.getElementById("calToday").addEventListener("click", function () {
+      selectDate(new Date());
+    });
+    calMonthSelect.addEventListener("change", function () {
+      calState.viewMonth = Number(calMonthSelect.value);
+      renderCalendar();
+    });
+    calYearSelect.addEventListener("change", function () {
+      calState.viewYear = Number(calYearSelect.value);
+      renderCalendar();
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!calendarPanel.contains(e.target) && e.target !== dobDisplay && !dobDisplay.contains(e.target)) {
+        closeCalendar();
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !calendarPanel.hasAttribute("hidden")) {
+        closeCalendar();
+        dobDisplay.focus();
+      }
+    });
+  }
+
+  function openCalendar() {
+    calendarPanel.removeAttribute("hidden");
+    dobDisplay.setAttribute("aria-expanded", "true");
+  }
+  function closeCalendar() {
+    calendarPanel.setAttribute("hidden", "");
+    dobDisplay.setAttribute("aria-expanded", "false");
+  }
+  function shiftMonth(delta) {
+    calState.viewMonth += delta;
+    if (calState.viewMonth > 11) { calState.viewMonth = 0; calState.viewYear++; }
+    if (calState.viewMonth < 0) { calState.viewMonth = 11; calState.viewYear--; }
+    renderCalendar();
+  }
+  function shiftYear(delta) {
+    calState.viewYear += delta;
+    renderCalendar();
+  }
+
+  function selectDate(d) {
+    if (startOfDay(d) > startOfDay(new Date())) return; // no future dates
+    calState.selected = d;
+    calState.viewYear = d.getFullYear();
+    calState.viewMonth = d.getMonth();
+    var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    dobHidden.value = iso;
+    dobDisplayText.textContent = fmtDisplay(d);
+    dobDisplay.classList.remove("placeholder");
+    closeCalendar();
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    if (!calGrid) return;
+    calMonthSelect.value = calState.viewMonth;
+    calYearSelect.value = calState.viewYear;
+
+    calGrid.innerHTML = "";
+    var firstOfMonth = new Date(calState.viewYear, calState.viewMonth, 1);
+    var startWeekday = firstOfMonth.getDay();
+    var totalDaysInMonth = daysInMonth(calState.viewYear, calState.viewMonth + 1);
+    var prevMonthDays = daysInMonth(calState.viewYear, calState.viewMonth);
+    var today = new Date();
+    var cellsNeeded = Math.ceil((startWeekday + totalDaysInMonth) / 7) * 7;
+
+    for (var i = 0; i < cellsNeeded; i++) {
+      var dayNum = i - startWeekday + 1;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cal-day";
+
+      var cellDate, outside = false;
+      if (dayNum < 1) {
+        cellDate = new Date(calState.viewYear, calState.viewMonth - 1, prevMonthDays + dayNum);
+        outside = true;
+      } else if (dayNum > totalDaysInMonth) {
+        cellDate = new Date(calState.viewYear, calState.viewMonth + 1, dayNum - totalDaysInMonth);
+        outside = true;
+      } else {
+        cellDate = new Date(calState.viewYear, calState.viewMonth, dayNum);
+      }
+
+      btn.textContent = cellDate.getDate();
+      if (outside) btn.classList.add("outside");
+      if (startOfDay(cellDate) === startOfDay(today)) btn.classList.add("today");
+      if (calState.selected && startOfDay(cellDate) === startOfDay(calState.selected)) btn.classList.add("selected");
+      if (startOfDay(cellDate) > startOfDay(today)) btn.disabled = true;
+
+      (function (d) {
+        btn.addEventListener("click", function () { selectDate(d); });
+      })(cellDate);
+
+      calGrid.appendChild(btn);
+    }
+  }
+
+  initCalendar();
+
   /* ============ MAIN FLOW ============ */
   var form = document.getElementById("ageForm");
-  var dobInput = document.getElementById("dob");
+  var tobInput = document.getElementById("tob");
   var errorEl = document.getElementById("errorMsg");
   var results = document.getElementById("results");
   var tickInterval = null;
-
-  if (dobInput) {
-    var today = new Date();
-    dobInput.max = today.toISOString().split("T")[0];
-  }
 
   function showError(msg) {
     errorEl.textContent = msg;
@@ -261,38 +405,67 @@
     errorEl.classList.remove("show");
   }
 
-  function populateResults(dob) {
+  function setText(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  function populateResults(dob, tobHH, tobMM, timeKnown) {
     if (tickInterval) clearInterval(tickInterval);
     results.classList.add("show");
     results.setAttribute("aria-live", "polite");
 
+    var didCountUp = {};
+    function countUpOnce(id, value) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (!didCountUp[id]) {
+        countUp(el, value, 900);
+        didCountUp[id] = true;
+      } else {
+        el.textContent = value;
+      }
+    }
+
     function refresh() {
       var now = new Date();
-      var data = computeAge(dob, now);
+      var data = computeAge(dob, tobHH, tobMM, now);
 
       countUpOnce("years", data.years);
       countUpOnce("months", data.months);
       countUpOnce("days", data.days);
 
-      var totalSeconds = Math.floor((now - dob) / 1000);
-      var hh = Math.floor(totalSeconds / 3600) % 24;
-      var mm = Math.floor(totalSeconds / 60) % 60;
-      var ss = totalSeconds % 60;
+      var hh = Math.floor(data.totalSeconds / 3600) % 24;
+      var mm = Math.floor(data.totalSeconds / 60) % 60;
+      var ss = data.totalSeconds % 60;
 
       document.getElementById("liveTotalDays").textContent = data.totalDays.toLocaleString();
-      var flipWrap = document.getElementById("liveClock");
-      renderFlipNumber(flipWrap, pad2(hh) + pad2(mm) + pad2(ss), 6);
+      renderFlipNumber(document.getElementById("liveClock"), pad2(hh) + pad2(mm) + pad2(ss), 6);
 
       setText("valWeeks", data.totalWeeks.toLocaleString());
-      setText("valHours", Math.floor((now - dob) / 3600000).toLocaleString());
-      setText("valMinutes", Math.floor((now - dob) / 60000).toLocaleString());
-      setText("valSeconds", totalSeconds.toLocaleString());
+      setText("valHours", data.totalHours.toLocaleString());
+      setText("valMinutes", data.totalMinutes.toLocaleString());
+      setText("valSeconds", data.totalSeconds.toLocaleString());
 
       setText("valDayOfWeek", data.dayOfWeek);
-      setText("valZodiac", data.zodiacSymbol + "  " + data.zodiac);
-      setText("valChinese", data.chineseZodiac);
       setText("valGeneration", data.generation);
       setText("valLeap", data.leapYears);
+      setText("valFullMoons", data.fullMoons.toLocaleString());
+      setText("valMarsAge", data.marsYearsWhole + " Mars yrs");
+      var marsCard = document.getElementById("valMarsAge");
+      if (marsCard) {
+        var marsSub = marsCard.parentElement.querySelector(".card-sub");
+        if (marsSub) marsSub.textContent = data.marsYearsExact.toFixed(2) + " exact \u00b7 a Mars year is 687 Earth days";
+      }
+
+      if (timeKnown) {
+        setText("valBornTime", pad2(tobHH) + ":" + pad2(tobMM));
+        setText("valBornTimeSub", "used for second-precision timing");
+      } else {
+        setText("valBornTime", "midnight (assumed)");
+        setText("valBornTimeSub", "add a time above for more precision");
+      }
 
       var lifeExpectancy = 80;
       var pct = Math.min(100, (data.years + data.months / 12) / lifeExpectancy * 100);
@@ -310,7 +483,7 @@
       setText("cdMinutes", pad2(m));
       setText("cdSeconds", pad2(s));
 
-      var heartbeats = Math.floor(totalSeconds / 60 * 75);
+      var heartbeats = Math.floor(data.totalSeconds / 60 * 75);
       setText("valHeartbeats", heartbeats.toLocaleString());
 
       if (data.isBirthdayToday && !window.__confettiFired) {
@@ -321,35 +494,17 @@
       }
     }
 
-    var didCountUp = {};
-    function countUpOnce(id, value) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      if (!didCountUp[id]) {
-        countUp(el, value, 900);
-        didCountUp[id] = true;
-      } else {
-        el.textContent = value;
-      }
-    }
-
     refresh();
     tickInterval = setInterval(refresh, 1000);
   }
-
-  function setText(id, val) {
-    var el = document.getElementById(id);
-    if (el) el.textContent = val;
-  }
-  function pad2(n) { return String(n).padStart(2, "0"); }
 
   if (form) {
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       clearError();
-      var val = dobInput.value;
-      if (!val) { showError("Please choose a date."); return; }
-      var parts = val.split("-").map(Number);
+
+      if (!dobHidden.value) { showError("Please choose a date."); return; }
+      var parts = dobHidden.value.split("-").map(Number);
       var dob = new Date(parts[0], parts[1] - 1, parts[2]);
       var now = new Date();
       if (startOfDay(dob) > startOfDay(now)) {
@@ -360,8 +515,16 @@
         showError("Please enter a year after 1900.");
         return;
       }
+
+      var tobHH = 0, tobMM = 0, timeKnown = false;
+      if (tobInput && tobInput.value) {
+        var tp = tobInput.value.split(":").map(Number);
+        tobHH = tp[0]; tobMM = tp[1];
+        timeKnown = true;
+      }
+
       window.__confettiFired = false;
-      populateResults(dob);
+      populateResults(dob, tobHH, tobMM, timeKnown);
       setTimeout(function () {
         results.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AGE — an instrument for measuring time</title>
-<meta name="description" content="A precise, elegant age calculator with live counters, zodiac, generation, next-birthday countdown and more.">
+<meta name="description" content="A precise, elegant age calculator with live counters, a full-moon count, your age on Mars, generation and more.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2246%22 fill=%22%230a0d1a%22 stroke=%22%23c9a227%22 stroke-width=%224%22/><circle cx=%2250%22 cy=%2250%22 r=%226%22 fill=%22%23e8c65a%22/></svg>">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -42,11 +42,48 @@
             <span class="sun" aria-hidden="true"></span>
 
             <div class="console">
-              <div class="date-input-wrap">
-                <label for="dob">Date of birth</label>
-                <input type="date" id="dob" name="dob" required
-                       value="{{ result.dob_iso if result else '' }}">
+              <div class="date-input-wrap js-only">
+                <label for="dobDisplay">Date of birth</label>
+                <button type="button" id="dobDisplay" class="date-display placeholder" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="dobDisplayText">Select a date</span>
+                  <span class="cal-icon" aria-hidden="true">&#128197;</span>
+                </button>
+                <input type="hidden" id="dob" value="{{ result.dob_iso if result else '' }}">
+
+                <div id="calendarPanel" class="calendar-panel" role="dialog" aria-label="Choose date of birth" hidden>
+                  <div class="cal-header">
+                    <button type="button" class="cal-nav" id="calPrevYear" aria-label="Previous year">&laquo;</button>
+                    <button type="button" class="cal-nav" id="calPrevMonth" aria-label="Previous month">&lsaquo;</button>
+                    <div class="cal-title">
+                      <select id="calMonthSelect" aria-label="Month"></select>
+                      <select id="calYearSelect" aria-label="Year"></select>
+                    </div>
+                    <button type="button" class="cal-nav" id="calNextMonth" aria-label="Next month">&rsaquo;</button>
+                    <button type="button" class="cal-nav" id="calNextYear" aria-label="Next year">&raquo;</button>
+                  </div>
+                  <div class="cal-weekdays">
+                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                  </div>
+                  <div class="cal-grid" id="calGrid"></div>
+                  <div class="cal-footer">
+                    <button type="button" class="cal-today-btn" id="calToday">Today</button>
+                  </div>
+                </div>
               </div>
+
+              <!-- no-JS fallback: plain native date input -->
+              <noscript>
+                <div class="date-input-wrap">
+                  <label for="dobFallback">Date of birth</label>
+                  <input type="date" id="dobFallback" name="dob" required value="{{ result.dob_iso if result else '' }}">
+                </div>
+              </noscript>
+
+              <div class="date-input-wrap">
+                <label for="tob">Time of birth <span style="opacity:.6;">(optional, for extra precision)</span></label>
+                <input type="time" id="tob" name="tob" value="{{ result.tob_hhmm if result and result.time_known else '' }}">
+              </div>
+
               <button type="submit" class="btn-calc">Read the instrument</button>
               <p id="errorMsg" class="error-msg{{ ' show' if error else '' }}">{{ error or '' }}</p>
             </div>
@@ -87,13 +124,21 @@
           </div>
 
           <div class="card">
-            <div class="card-top"><span class="icon">✦</span><span class="card-lbl">Zodiac sign</span></div>
-            <div class="card-val" id="valZodiac">—</div>
+            <div class="card-top"><span class="icon">◔</span><span class="card-lbl">Born at</span></div>
+            <div class="card-val" id="valBornTime">—</div>
+            <div class="card-sub" id="valBornTimeSub"></div>
           </div>
 
           <div class="card">
-            <div class="card-top"><span class="icon">龍</span><span class="card-lbl">Chinese zodiac</span></div>
-            <div class="card-val" id="valChinese">—</div>
+            <div class="card-top"><span class="icon">☽</span><span class="card-lbl">Full moons witnessed</span></div>
+            <div class="card-val" id="valFullMoons">—</div>
+            <div class="card-sub">one for every ~29.5 days you've been alive</div>
+          </div>
+
+          <div class="card">
+            <div class="card-top"><span class="icon">♂</span><span class="card-lbl">Age on Mars</span></div>
+            <div class="card-val" id="valMarsAge">—</div>
+            <div class="card-sub">a Mars year is 687 Earth days</div>
           </div>
 
           <div class="card">
@@ -153,8 +198,9 @@
         <p class="tools-heading">Readings from the instrument</p>
         <div class="grid">
           <div class="card"><div class="card-lbl">Born on a</div><div class="card-val">{{ result.day_of_week }}</div></div>
-          <div class="card"><div class="card-lbl">Zodiac sign</div><div class="card-val">{{ result.zodiac_symbol }} {{ result.zodiac }}</div></div>
-          <div class="card"><div class="card-lbl">Chinese zodiac</div><div class="card-val">{{ result.chinese_zodiac }}</div></div>
+          <div class="card"><div class="card-lbl">Born at</div><div class="card-val">{{ result.tob_hhmm if result.time_known else 'time not given' }}</div></div>
+          <div class="card"><div class="card-lbl">Full moons witnessed</div><div class="card-val">{{ result.full_moons }}</div></div>
+          <div class="card"><div class="card-lbl">Age on Mars</div><div class="card-val">{{ result.mars_years_whole }} Mars yrs</div><div class="card-sub">({{ result.mars_years }} exact)</div></div>
           <div class="card"><div class="card-lbl">Generation</div><div class="card-val">{{ result.generation }}</div></div>
           <div class="card"><div class="card-lbl">Leap years lived</div><div class="card-val">{{ result.leap_years }}</div></div>
           <div class="card"><div class="card-lbl">Next birthday</div><div class="card-val">in {{ result.next_birthday_days }} days</div></div>
