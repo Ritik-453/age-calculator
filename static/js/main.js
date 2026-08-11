@@ -70,6 +70,51 @@
   /* ============ CONSTANTS ============ */
   var SYNODIC_MONTH_DAYS = 29.530588853;
   var MARS_YEAR_DAYS = 686.9713;
+  var REFERENCE_NEW_MOON = new Date(2000, 0, 6, 18, 14, 0);
+
+  var MOON_PHASES = [
+    ["New Moon", "\u{1F311}"],
+    ["Waxing Crescent", "\u{1F312}"],
+    ["First Quarter", "\u{1F313}"],
+    ["Waxing Gibbous", "\u{1F314}"],
+    ["Full Moon", "\u{1F315}"],
+    ["Waning Gibbous", "\u{1F316}"],
+    ["Last Quarter", "\u{1F317}"],
+    ["Waning Crescent", "\u{1F318}"]
+  ];
+
+  var TIME_OF_DAY = [
+    [0, 5, "the dead of night"],
+    [5, 7, "the first light of dawn"],
+    [7, 12, "the morning"],
+    [12, 14, "midday"],
+    [14, 17, "the afternoon"],
+    [17, 19, "golden hour"],
+    [19, 21, "dusk"],
+    [21, 24, "the night"]
+  ];
+
+  function moonPhaseAt(dt) {
+    var daysSince = (dt.getTime() - REFERENCE_NEW_MOON.getTime()) / 86400000;
+    var frac = ((daysSince % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS / SYNODIC_MONTH_DAYS;
+    var idx = Math.round(frac * 8) % 8;
+    return MOON_PHASES[idx];
+  }
+
+  function timeOfDayPhrase(hour) {
+    for (var i = 0; i < TIME_OF_DAY.length; i++) {
+      if (hour >= TIME_OF_DAY[i][0] && hour < TIME_OF_DAY[i][1]) return TIME_OF_DAY[i][2];
+    }
+    return "the night";
+  }
+
+  function buildNarrative(dayOfWeek, timeKnown, tobHH, moonName) {
+    if (timeKnown) {
+      var phrase = timeOfDayPhrase(tobHH);
+      return "You arrived on a " + dayOfWeek + ", during " + phrase + ", beneath a " + moonName + ".";
+    }
+    return "You arrived on a " + dayOfWeek + ", beneath a " + moonName + ". Add a birth time above to reveal the moment of day.";
+  }
 
   var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"];
@@ -95,7 +140,7 @@
   }
 
   /* ============ AGE MATH (mirrors the server's exact-time logic) ============ */
-  function computeAge(dobDate, tobHH, tobMM, now) {
+  function computeAge(dobDate, tobHH, tobMM, now, timeKnown) {
     var birthDt = new Date(dobDate.getFullYear(), dobDate.getMonth(), dobDate.getDate(), tobHH, tobMM, 0);
 
     var years = now.getFullYear() - dobDate.getFullYear();
@@ -131,18 +176,24 @@
     var fullMoons = Math.floor(totalDays / SYNODIC_MONTH_DAYS);
     var marsYearsExact = totalDays / MARS_YEAR_DAYS;
 
+    var dayOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dobDate.getDay()];
+    var moon = moonPhaseAt(birthDt);
+    var narrative = buildNarrative(dayOfWeek, !!timeKnown, tobHH, moon[0]);
+
     return {
       years: years, months: months, days: days,
       totalDays: totalDays, totalSeconds: totalSeconds,
       totalWeeks: Math.floor(totalDays / 7),
       totalHours: Math.floor(totalSeconds / 3600),
       totalMinutes: Math.floor(totalSeconds / 60),
-      dayOfWeek: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dobDate.getDay()],
+      dayOfWeek: dayOfWeek,
       generation: generationOf(dobDate.getFullYear()),
       leapYears: leapYears,
       fullMoons: fullMoons,
       marsYearsExact: marsYearsExact,
       marsYearsWhole: Math.floor(marsYearsExact),
+      moonName: moon[0], moonEmoji: moon[1],
+      narrative: narrative,
       nextBirthday: nextBirthday,
       isBirthdayToday: now.getMonth() === dobDate.getMonth() && now.getDate() === dobDate.getDate()
     };
@@ -430,7 +481,7 @@
 
     function refresh() {
       var now = new Date();
-      var data = computeAge(dob, tobHH, tobMM, now);
+      var data = computeAge(dob, tobHH, tobMM, now, timeKnown);
 
       countUpOnce("years", data.years);
       countUpOnce("months", data.months);
@@ -447,10 +498,9 @@
       setText("valHours", data.totalHours.toLocaleString());
       setText("valMinutes", data.totalMinutes.toLocaleString());
       setText("valSeconds", data.totalSeconds.toLocaleString());
-
-      setText("valDayOfWeek", data.dayOfWeek);
-      setText("valGeneration", data.generation);
       setText("valLeap", data.leapYears);
+
+      setText("valGeneration", data.generation);
       setText("valFullMoons", data.fullMoons.toLocaleString());
       setText("valMarsAge", data.marsYearsWhole + " Mars yrs");
       var marsCard = document.getElementById("valMarsAge");
@@ -459,13 +509,12 @@
         if (marsSub) marsSub.textContent = data.marsYearsExact.toFixed(2) + " exact \u00b7 a Mars year is 687 Earth days";
       }
 
-      if (timeKnown) {
-        setText("valBornTime", pad2(tobHH) + ":" + pad2(tobMM));
-        setText("valBornTimeSub", "used for second-precision timing");
-      } else {
-        setText("valBornTime", "midnight (assumed)");
-        setText("valBornTimeSub", "add a time above for more precision");
-      }
+      setText("narrativeText", data.narrative);
+      setText("chipDay", data.dayOfWeek);
+      setText("chipTime", timeKnown ? (pad2(tobHH) + ":" + pad2(tobMM)) : "time unknown");
+      setText("chipMoon", data.moonName);
+      var moonIconEl = document.getElementById("moonIcon");
+      if (moonIconEl) moonIconEl.textContent = data.moonEmoji;
 
       var lifeExpectancy = 80;
       var pct = Math.min(100, (data.years + data.months / 12) / lifeExpectancy * 100);

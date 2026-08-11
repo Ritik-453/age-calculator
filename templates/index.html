@@ -118,15 +118,14 @@
         <p class="tools-heading">Readings from the instrument</p>
         <div class="grid">
 
-          <div class="card">
-            <div class="card-top"><span class="icon">☾</span><span class="card-lbl">Born on a</span></div>
-            <div class="card-val" id="valDayOfWeek">—</div>
-          </div>
-
-          <div class="card">
-            <div class="card-top"><span class="icon">◔</span><span class="card-lbl">Born at</span></div>
-            <div class="card-val" id="valBornTime">—</div>
-            <div class="card-sub" id="valBornTimeSub"></div>
+          <div class="card wide birth-moment">
+            <div class="card-top"><span class="icon" id="moonIcon">&#127761;</span><span class="card-lbl">Your birth moment</span></div>
+            <p class="narrative" id="narrativeText">—</p>
+            <div class="bm-chips">
+              <span class="chip" id="chipDay">—</span>
+              <span class="chip" id="chipTime">—</span>
+              <span class="chip" id="chipMoon">—</span>
+            </div>
           </div>
 
           <div class="card">
@@ -146,27 +145,6 @@
             <div class="card-val" id="valGeneration">—</div>
           </div>
 
-          <div class="card">
-            <div class="card-top"><span class="icon">↻</span><span class="card-lbl">Leap years lived</span></div>
-            <div class="card-val" id="valLeap">—</div>
-          </div>
-
-          <div class="card">
-            <div class="card-top"><span class="icon">♡</span><span class="card-lbl">Estimated heartbeats</span></div>
-            <div class="card-val" id="valHeartbeats">—</div>
-            <div class="card-sub">at a resting ~75 bpm — a rough estimate, not medical advice</div>
-          </div>
-
-          <div class="card wide">
-            <div class="card-top"><span class="icon">⏳</span><span class="card-lbl">Time lived, by unit</span></div>
-            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); margin-top:4px;">
-              <div><div class="card-val" id="valWeeks" style="font-size:16px;">—</div><div class="card-sub">weeks</div></div>
-              <div><div class="card-val" id="valHours" style="font-size:16px;">—</div><div class="card-sub">hours</div></div>
-              <div><div class="card-val" id="valMinutes" style="font-size:16px;">—</div><div class="card-sub">minutes</div></div>
-              <div><div class="card-val" id="valSeconds" style="font-size:16px;">—</div><div class="card-sub">seconds</div></div>
-            </div>
-          </div>
-
           <div class="card wide">
             <div class="card-top"><span class="icon">◷</span><span class="card-lbl">Next birthday in</span></div>
             <div class="countdown">
@@ -183,6 +161,19 @@
             <div class="life-bar-track"><div class="life-bar-fill" id="lifeBarFill"></div></div>
           </div>
 
+          <div class="card wide">
+            <div class="card-top"><span class="icon">⏳</span><span class="card-lbl">By the numbers</span></div>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); margin-top:4px;">
+              <div><div class="card-val" id="valWeeks" style="font-size:16px;">—</div><div class="card-sub">weeks</div></div>
+              <div><div class="card-val" id="valHours" style="font-size:16px;">—</div><div class="card-sub">hours</div></div>
+              <div><div class="card-val" id="valMinutes" style="font-size:16px;">—</div><div class="card-sub">minutes</div></div>
+              <div><div class="card-val" id="valSeconds" style="font-size:16px;">—</div><div class="card-sub">seconds</div></div>
+              <div><div class="card-val" id="valLeap" style="font-size:16px;">—</div><div class="card-sub">leap years</div></div>
+              <div><div class="card-val" id="valHeartbeats" style="font-size:16px;">—</div><div class="card-sub">heartbeats*</div></div>
+            </div>
+            <div class="card-sub" style="margin-top:8px;">*estimated at a resting ~75 bpm — a rough estimate, not medical advice</div>
+          </div>
+
         </div>
       </section>
 
@@ -197,20 +188,28 @@
         <p class="ticker">{{ result.total_days }} total days lived · {{ result.decimal_years }} years exactly</p>
         <p class="tools-heading">Readings from the instrument</p>
         <div class="grid">
-          <div class="card"><div class="card-lbl">Born on a</div><div class="card-val">{{ result.day_of_week }}</div></div>
-          <div class="card"><div class="card-lbl">Born at</div><div class="card-val">{{ result.tob_hhmm if result.time_known else 'time not given' }}</div></div>
+          <div class="card wide birth-moment">
+            <div class="card-top"><span class="icon">{{ result.moon_phase_emoji }}</span><span class="card-lbl">Your birth moment</span></div>
+            <p class="narrative">{{ result.narrative }}</p>
+            <div class="bm-chips">
+              <span class="chip">{{ result.day_of_week }}</span>
+              <span class="chip">{{ result.tob_hhmm if result.time_known else 'time unknown' }}</span>
+              <span class="chip">{{ result.moon_phase_name }}</span>
+            </div>
+          </div>
           <div class="card"><div class="card-lbl">Full moons witnessed</div><div class="card-val">{{ result.full_moons }}</div></div>
           <div class="card"><div class="card-lbl">Age on Mars</div><div class="card-val">{{ result.mars_years_whole }} Mars yrs</div><div class="card-sub">({{ result.mars_years }} exact)</div></div>
           <div class="card"><div class="card-lbl">Generation</div><div class="card-val">{{ result.generation }}</div></div>
-          <div class="card"><div class="card-lbl">Leap years lived</div><div class="card-val">{{ result.leap_years }}</div></div>
           <div class="card"><div class="card-lbl">Next birthday</div><div class="card-val">in {{ result.next_birthday_days }} days</div></div>
           <div class="card wide">
-            <div class="card-lbl">Time lived, by unit</div>
-            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); margin-top:4px;">
+            <div class="card-lbl">By the numbers</div>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); margin-top:4px;">
               <div><div class="card-val" style="font-size:16px;">{{ result.total_weeks }}</div><div class="card-sub">weeks</div></div>
               <div><div class="card-val" style="font-size:16px;">{{ result.total_hours }}</div><div class="card-sub">hours</div></div>
               <div><div class="card-val" style="font-size:16px;">{{ result.total_minutes }}</div><div class="card-sub">minutes</div></div>
               <div><div class="card-val" style="font-size:16px;">{{ result.total_seconds }}</div><div class="card-sub">seconds</div></div>
+              <div><div class="card-val" style="font-size:16px;">{{ result.leap_years }}</div><div class="card-sub">leap years</div></div>
+              <div><div class="card-val" style="font-size:16px;">{{ result.heartbeats }}</div><div class="card-sub">heartbeats*</div></div>
             </div>
           </div>
         </div>

@@ -629,6 +629,44 @@ input[type="time"]:focus-visible{
 
 .card.wide{ grid-column: 1 / -1; }
 
+/* birth moment narrative card */
+.birth-moment .icon{
+  font-size: 22px;
+  animation: moon-glow calc(4s / var(--dur, 1)) ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes moon-glow{
+  0%, 100%{ filter: drop-shadow(0 0 0px rgba(232,198,90,0)); transform: scale(1); }
+  50%{ filter: drop-shadow(0 0 6px rgba(232,198,90,.6)); transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce){
+  .birth-moment .icon{ animation: none; }
+}
+.narrative{
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--text-parchment);
+  margin: 4px 0 12px;
+}
+.bm-chips{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip{
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--accent-gold-bright);
+  background: rgba(201,162,39,.12);
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
 /* life progress dial */
 .life-bar-track{
   width: 100%;

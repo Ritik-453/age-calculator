@@ -16,6 +16,29 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 
 SYNODIC_MONTH_DAYS = 29.530588853  # average full-moon-to-full-moon cycle
 MARS_YEAR_DAYS = 686.9713          # length of a Mars year, in Earth days
+REFERENCE_NEW_MOON = datetime(2000, 1, 6, 18, 14, 0)  # a known new moon
+
+MOON_PHASES = [
+    ("New Moon", "\U0001F311"),
+    ("Waxing Crescent", "\U0001F312"),
+    ("First Quarter", "\U0001F313"),
+    ("Waxing Gibbous", "\U0001F314"),
+    ("Full Moon", "\U0001F315"),
+    ("Waning Gibbous", "\U0001F316"),
+    ("Last Quarter", "\U0001F317"),
+    ("Waning Crescent", "\U0001F318"),
+]
+
+TIME_OF_DAY = [
+    (0, 5, "the dead of night", "\U0001F30C"),
+    (5, 7, "the first light of dawn", "\U0001F305"),
+    (7, 12, "the morning", "\u2600\uFE0F"),
+    (12, 14, "midday", "\U0001F324\uFE0F"),
+    (14, 17, "the afternoon", "\U0001F3D9\uFE0F"),
+    (17, 19, "golden hour", "\U0001F306"),
+    (19, 21, "dusk", "\U0001F303"),
+    (21, 24, "the night", "\U0001F319"),
+]
 
 
 def generation_of(year):
@@ -30,6 +53,28 @@ def generation_of(year):
     if year >= 1946:
         return "Baby Boomer"
     return "Silent Generation"
+
+
+def moon_phase_at(dt):
+    days_since = (dt - REFERENCE_NEW_MOON).total_seconds() / 86400
+    frac = (days_since % SYNODIC_MONTH_DAYS) / SYNODIC_MONTH_DAYS
+    idx = int(round(frac * 8)) % 8
+    return MOON_PHASES[idx]
+
+
+def time_of_day_phrase(hour):
+    for start, end, phrase, emoji in TIME_OF_DAY:
+        if start <= hour < end:
+            return phrase, emoji
+    return "the night", "\U0001F319"
+
+
+def build_narrative(dob, tob, time_known, moon_name):
+    day_name = DAYS[dob.weekday()]
+    if time_known:
+        phrase, _ = time_of_day_phrase(tob.hour)
+        return f"You arrived on a {day_name}, during {phrase}, beneath a {moon_name}."
+    return f"You arrived on a {day_name}, beneath a {moon_name}. Add a birth time above to reveal the moment of day."
 
 
 def calculate_age(dob, tob, time_known):
@@ -74,6 +119,12 @@ def calculate_age(dob, tob, time_known):
     mars_years_exact = total_days / MARS_YEAR_DAYS
     mars_years_whole = int(mars_years_exact)
 
+    moon_name, moon_emoji = moon_phase_at(birth_dt)
+    tod_phrase, tod_emoji = time_of_day_phrase(tob.hour) if time_known else (None, None)
+    narrative = build_narrative(dob, tob, time_known, moon_name)
+
+    heartbeats = int(total_seconds / 60 * 75)
+
     return {
         "years": years,
         "months": months,
@@ -92,6 +143,12 @@ def calculate_age(dob, tob, time_known):
         "full_moons": full_moons,
         "mars_years": round(mars_years_exact, 2),
         "mars_years_whole": mars_years_whole,
+        "heartbeats": heartbeats,
+        "moon_phase_name": moon_name,
+        "moon_phase_emoji": moon_emoji,
+        "time_of_day_phrase": tod_phrase,
+        "time_of_day_emoji": tod_emoji,
+        "narrative": narrative,
         "dob_iso": dob.isoformat(),
         "tob_hhmm": tob.strftime("%H:%M"),
         "time_known": time_known,
